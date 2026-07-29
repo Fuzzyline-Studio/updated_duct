@@ -109,8 +109,7 @@ void DuctKill()
             }
             else
             {
-                // 덕트킬 한국어 음성 넣을 예정
-                return;
+                Mp3PlayLargeFolder(4, 3);
             }
             cool_time_neo_bool = false;
             pixels_line.lightColor(purple);
