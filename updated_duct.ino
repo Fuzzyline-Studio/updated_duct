@@ -17,10 +17,9 @@
 /**
  * @brief  Duct Initialize
  */
-void DuctInit()
-{
+void DuctInit() {
   Serial.begin(115200);
-  has2wifi.Setup("badland");
+  has2wifi.Setup("city");
   // 부팅 시 현재 펌웨어 버전을 서버(esp_version)로 전송
   has2wifi.Send((String)(const char*)my["device_name"], "esp_version", String(FIRMWARE_VER));
   ota.setLogStream(Serial);
@@ -30,12 +29,11 @@ void DuctInit()
   ota.setOnSkip([]() {
     has2wifi.Send((String)(const char*)my["device_name"], "device_state", "setting");
   });
-    ota.setPartitionUpdate(
-        "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partitions.bin",
-        "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partitions.sig",
-        "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partition_version.txt",
-        PARTITION_VER
-    );
+  ota.setPartitionUpdate(
+    "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partitions.bin",
+    "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partitions.sig",
+    "https://raw.githubusercontent.com/Fuzzyline-HAS2/updated_duct/main/partition_version.txt",
+    PARTITION_VER);
   SensorInit();
   DataChange();
   TimerInit();
@@ -44,8 +42,7 @@ void DuctInit()
 /**
  * @brief 아두이노 기본 문법 (전원이 켜지면 한번만 실행)
  */
-void setup()
-{
+void setup() {
   delay(1000);
   Serial.begin(115200);
   DuctInit();
@@ -54,15 +51,15 @@ void setup()
 /**
  * @brief 아두이노 기본 문법 (전원이 켜져있는동안 Core1에서 계속 실행)
  */
-void loop()
-{
+void loop() {
   TimerRun();
   EmegencyPush();
 
-  if(game_state == activate){ ActivateFunc(); }
-  else{  // 쿨타임 없이 사용(크루용) 세팅 모드 : 태그, 스위치 둘다 가능 / 레디 : 스위치만 가능 
+  if (game_state == activate) {
+    ActivateFunc();
+  } else {  // 쿨타임 없이 사용(크루용) 세팅 모드 : 태그, 스위치 둘다 가능 / 레디 : 스위치만 가능
     RfidLoop();
-    if(!digitalRead(SW_PIN)){
+    if (!digitalRead(SW_PIN)) {
       Serial.println("staff");
       digitalWrite(RELAY_PIN, HIGH);
       delay(5000);
