@@ -21,6 +21,19 @@ void DuctTag(String tag_player)
 
 void DuctOpen(bool switch_push)
 {
+    // 봉쇄("이로운 효과") 중 내부 스위치: 도어만 열고 상태·네오픽셀·서버 보고는 건드리지 않는다.
+    // duct_available 을 내리면 CooltimeTimerFunc 가 tagger_mode 로 조기 return 하므로 쿨타임이
+    // 진행되지 않아, 봉쇄가 풀릴 때까지 덕트가 빨간 잠금 상태로 고착된다(프리즈).
+    // 도어가 열려 있는 동안 덕트킬은 EMCHECK_PIN 기준으로 그대로 동작한다.
+    if (tagger_mode && switch_push)
+    {
+        switch_available = false;
+        Mp3PlayLargeFolder(1, 2);
+        digitalWrite(RELAY_PIN, HIGH);
+        duct_close_timer_id = duct_close_timer.setTimeout(4000, TaggerSwitchClose);
+        return;
+    }
+
     if (duct_available || switch_push)
     {
         if (cooltime_timer.isEnabled(cooltime_timer_id))
@@ -51,6 +64,27 @@ void DuctClose()
         cooltime_timer_id = cooltime_timer.setInterval(1000, CooltimeTimerFunc);
     }
     has2wifi.Send((String)(const char *)my["device_name"], "device_state", "lock");
+}
+
+/**
+ * @brief 봉쇄 중 내부 스위치로 열린 도어를 닫는다.
+ *        duct_available / current_time / cooltime / 네오픽셀 / 서버 상태는 손대지 않는다.
+ */
+void TaggerSwitchClose()
+{
+    digitalWrite(RELAY_PIN, LOW);
+    switch_available = true;
+}
+
+/**
+ * @brief 남은 쿨타임을 네오픽셀 개수로 환산한다.
+ *        cooltime 이 0이면(= 쿨타임 없이 잠긴 상태) 나눗셈을 건너뛴다.
+ *        ESP32(Xtensa)는 정수 0 나누기에서 IntegerDivideByZero 예외로 패닉한다.
+ */
+int CooltimeBarPixels()
+{
+    if (cooltime <= 0) return NUMPIXELS_LINE;
+    return NUMPIXELS_LINE * (cooltime - current_time) / cooltime;
 }
 
 /**
@@ -194,9 +228,13 @@ void MmmmClose()
         current_time      = mmmm_prev_current_time;
         cool_time_neo_bool = mmmm_prev_cool_time_neo_bool;
         pixels_line.clear();
-        pixels_line.lightColor(line_red, NUMPIXELS_LINE * (cooltime - current_time) / cooltime);
+        pixels_line.lightColor(line_red, CooltimeBarPixels());
         pixels_switch.lightColor(yellow);
-        if (mmmm_prev_cooltime_running)
+        // 잠긴 상태로 남길 때는 카운트다운이 반드시 돌아야 한다. 이전 실행 여부로 판단하면
+        // (스위치/RFID 오픈 4초 중 MMMM 태그처럼) 타이머가 없던 시점을 기억해 재가동을 건너뛰고,
+        // duct_available 이 false 에 고착돼 game_state 가 바뀔 때까지 덕트가 잠긴다.
+        // DuctClose 와 동일하게 "지금 돌고 있지 않으면 켠다"로 판단한다.
+        if (!cooltime_timer.isEnabled(cooltime_timer_id))
             cooltime_timer_id = cooltime_timer.setInterval(1000, CooltimeTimerFunc);
         has2wifi.Send((String)(const char *)my["device_name"], "device_state", "lock");
     }
