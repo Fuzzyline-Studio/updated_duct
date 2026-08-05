@@ -124,25 +124,39 @@ void DataChange()
         else if((String)(const char *)my["device_state"] == "back"){
             ExitTaggerMode();
         }
+        // 게임 중에는 game_state 가 이미 activate 라 재전송해도 변경 감지에 걸리지 않는다.
+        // 봉쇄 해제를 device_state=activate 로도 받을 수 있게 한다(봉쇄 중 device_state 는
+        // tagger 이므로 실제로 값이 바뀐다). ExitTaggerMode 가 되보내는 activate 는
+        // 이미 cur 에 반영된 뒤라 재진입하지 않는다.
+        else if((String)(const char *)my["device_state"] == "activate"){
+            ExitTaggerMode();
+        }
         else if((String)(const char *)my["device_state"] == "open"){
             MmmmOpen();
         }
     }
 
-    // 아래 분기들은 tagger 동결 중에는 무시 (game_state/cool_time 보존)
-    if(!tagger_mode){
-        if ((String)(const char *)my["game_state"] != (String)(const char *)cur["game_state"]){
-            if ((String)(const char *)my["game_state"] == "setting"){
-                SettingFunc();
-            }
-            else if ((String)(const char *)my["game_state"] == "ready"){
-                ReadyFunc();
-            }
-            else if ((String)(const char *)my["game_state"] == "activate"){
-                ActivateRunOnce();
-            }
+    // game_state 전환(setting/ready/activate)은 동결보다 우선한다.
+    // 이 함수들이 use_duct_num/duct_available/current_time/cooltime 을 스스로 초기화하므로
+    // 동결로 보존할 값 자체가 없고, 반대로 무시하면 봉쇄 중 게임이 리셋됐을 때
+    // back 이 오기 전까지(= 다음 게임까지) 보라색 + RFID 차단이 그대로 남는다.
+    if ((String)(const char *)my["game_state"] != (String)(const char *)cur["game_state"]){
+        if ((String)(const char *)my["game_state"] == "setting"){
+            tagger_mode = false;
+            SettingFunc();
         }
+        else if ((String)(const char *)my["game_state"] == "ready"){
+            tagger_mode = false;
+            ReadyFunc();
+        }
+        else if ((String)(const char *)my["game_state"] == "activate"){
+            tagger_mode = false;
+            ActivateRunOnce();
+        }
+    }
 
+    // 아래 분기들은 tagger 동결 중에는 무시 (덕트 강제 오픈/밝기 재도색이 동결을 깨뜨림)
+    if(!tagger_mode){
         if((String)(const char *)my["manage_state"] != (String)(const char *)cur["manage_state"]){
             if((String)(const char *)my["manage_state"] == "mo"){
                 DuctOpen();
