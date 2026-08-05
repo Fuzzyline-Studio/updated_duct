@@ -12,6 +12,11 @@
 ArduinoOutput/*
 .vscode/*
 
+# Arduino CLI / local agent build outputs
+build/
+.omc/
+.DS_Store
+
 # 비밀키 (GitHub에 올라가면 안 됨)
 secrets.h
 scripts/secrets.py
