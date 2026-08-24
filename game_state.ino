@@ -167,6 +167,7 @@ void EnterTaggerMode()
 {
     if (tagger_mode) return;   // 재진입 방지 (tagger -> activate -> tagger 등)
     tagger_mode = true;        // RfidLoop / CooltimeTimerFunc 자동 정지
+    Mp3PlayLargeFolder(4, 1);  // "덕트 봉쇄완료"
     pixels_line.lightColor(line_purple);
     pixels_round.lightColor(purple);
     pixels_switch.lightColor(purple);
