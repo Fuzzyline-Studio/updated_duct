@@ -111,7 +111,7 @@ void ActivateRunOnce()
  */
 void DataChange()
 {
-    static StaticJsonDocument<1000> cur;
+    static StaticJsonDocument<2048> cur;
 
     // device_state 분기는 항상 처리 (tagger 동결 중에도 back 수신을 감지해야 함)
     if((String)(const char *)my["device_state"] != (String)(const char *)cur["device_state"]){
