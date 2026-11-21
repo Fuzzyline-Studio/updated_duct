@@ -27,10 +27,7 @@ void DuctOpen(bool switch_push)
     // 도어가 열려 있는 동안 덕트킬은 EMCHECK_PIN 기준으로 그대로 동작한다.
     if (tagger_mode && switch_push)
     {
-        switch_available = false;
-        Mp3PlayLargeFolder(1, 2);
-        digitalWrite(RELAY_PIN, HIGH);
-        duct_close_timer_id = duct_close_timer.setTimeout(4000, TaggerSwitchClose);
+        TaggerDoorOpen();
         return;
     }
 
@@ -54,8 +51,6 @@ void DuctOpen(bool switch_push)
 void DuctClose()
 {
     digitalWrite(RELAY_PIN, LOW);
-    pixels_line.lightColor(line_red);
-    pixels_switch.lightColor(yellow);
     switch_available = true;
     current_time = 0;
     cool_time_neo_bool = true;
@@ -63,7 +58,27 @@ void DuctClose()
     {
         cooltime_timer_id = cooltime_timer.setInterval(1000, CooltimeTimerFunc);
     }
+    // 열림 4초 사이에 봉쇄가 시작된 경우: 보라색을 유지하고 lock 을 보내지 않는다
+    // (봉쇄 중 서버의 device_state=tagger 를 덮어쓰지 않는다).
+    // 해제 시 ExitTaggerMode 가 빨강 재도색 + lock 전송을 대신하고 쿨타임이 그때부터 흐른다.
+    if (tagger_mode) return;
+    pixels_line.lightColor(line_red);
+    pixels_switch.lightColor(yellow);
     has2wifi.Send((String)(const char *)my["device_name"], "device_state", "lock");
+}
+
+/**
+ * @brief 봉쇄 중 도어만 4초 연다 (내부 스위치·MMMM 카드·서버 open 공통).
+ *        duct_available / current_time / cooltime / 네오픽셀 / 서버 상태는 손대지 않는다.
+ */
+void TaggerDoorOpen()
+{
+    // 이미 열려 있는 4초 동안은 다시 열지 않는다 (카드를 대고 있으면 500ms 마다 재호출됨).
+    if (!switch_available) return;
+    switch_available = false;
+    Mp3PlayLargeFolder(1, 2);
+    digitalWrite(RELAY_PIN, HIGH);
+    duct_close_timer_id = duct_close_timer.setTimeout(4000, TaggerSwitchClose);
 }
 
 /**
@@ -188,6 +203,11 @@ void DuctKill()
 void MmmmOpen()
 {
     if (mmmm_open) return;
+    if (tagger_mode)   // 봉쇄 중: 도어만 열고 상태·색·서버 보고는 그대로 둔다
+    {
+        TaggerDoorOpen();
+        return;
+    }
     mmmm_open = true;
 
     mmmm_prev_duct_available     = duct_available;
@@ -214,10 +234,13 @@ void MmmmClose()
     mmmm_open        = false;
     switch_available = true;
 
+    // MMMM 열림 4초 사이에 봉쇄가 시작된 경우: 상태만 되돌리고 보라색 유지·서버 보고 생략.
+    // 해제 시 ExitTaggerMode 가 duct_available 기준으로 재도색하고 activate/lock 을 보낸다.
     if (mmmm_prev_duct_available)
     {
         duct_available    = true;
         cool_time_neo_bool = false;
+        if (tagger_mode) return;
         pixels_line.lightColor(line_yellow);
         pixels_round.lightColor(yellow);
         pixels_switch.lightColor(yellow);
@@ -227,15 +250,16 @@ void MmmmClose()
         duct_available    = false;
         current_time      = mmmm_prev_current_time;
         cool_time_neo_bool = mmmm_prev_cool_time_neo_bool;
-        pixels_line.clear();
-        pixels_line.lightColor(line_red, CooltimeBarPixels());
-        pixels_switch.lightColor(yellow);
         // 잠긴 상태로 남길 때는 카운트다운이 반드시 돌아야 한다. 이전 실행 여부로 판단하면
         // (스위치/RFID 오픈 4초 중 MMMM 태그처럼) 타이머가 없던 시점을 기억해 재가동을 건너뛰고,
         // duct_available 이 false 에 고착돼 game_state 가 바뀔 때까지 덕트가 잠긴다.
         // DuctClose 와 동일하게 "지금 돌고 있지 않으면 켠다"로 판단한다.
         if (!cooltime_timer.isEnabled(cooltime_timer_id))
             cooltime_timer_id = cooltime_timer.setInterval(1000, CooltimeTimerFunc);
+        if (tagger_mode) return;
+        pixels_line.clear();
+        pixels_line.lightColor(line_red, CooltimeBarPixels());
+        pixels_switch.lightColor(yellow);
         has2wifi.Send((String)(const char *)my["device_name"], "device_state", "lock");
     }
 }
